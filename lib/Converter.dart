@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
 
 class Converter extends StatefulWidget {
   const Converter({Key? key}) : super(key: key);
@@ -8,63 +11,116 @@ class Converter extends StatefulWidget {
 }
 
 class _ConverterState extends State<Converter> {
+  List<String> currencies = [
+    'USD'
+  ]; // List to hold currency options, initialize with a default currency
   String selectedCurrency1 = 'USD'; // Initially selected currency for first dropdown
   String selectedCurrency2 = 'USD'; // Initially selected currency for second dropdown
+  double exchangeRate = 1.0;
+  double amount = 0.0;
+  final String appId = 'bccbefbec6c2496f81a608e5e120da79';
 
-  String getFlagImage(String currency) {
-    switch (currency) {
-      case 'USD':
-        return 'images/UsaFlag.png';
-      case 'EUR':
-        return 'images/EuroFlag.png';
-      case 'GBP':
-        return 'images/GbpFlag.png';
-      case 'JPY':
-        return 'images/JpyFlag.png';
-      case 'RS':
-        return 'images/PakFlag.png'; // Change this to the path of your flag image
-      default:
-        return 'images/DefaultFlag.png'; // Change this to the path of your default flag image
+  @override
+  void initState() {
+    super.initState();
+    fetchCurrencies();
+  }
+
+  Future<void> fetchCurrencies() async {
+    try {
+      final currencyResponse = await http.get(Uri.parse(
+          'https://openexchangerates.org/api/currencies.json?app_id=$appId'));
+
+      if (currencyResponse.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(currencyResponse.body);
+        // Extract currencies from the API response
+        List<String> fetchedCurrencies = data.keys.toList();
+        setState(() {
+          currencies = fetchedCurrencies;
+          selectedCurrency1 = fetchedCurrencies.first;
+          selectedCurrency2 = fetchedCurrencies.first;
+        });
+      } else {
+        throw Exception('Failed to fetch currencies');
+      }
+
+      await fetchExchangeRate();
+    } catch (error) {
+      print('Error fetching currencies: $error');
     }
   }
 
-  void swapCurrencies() {
+  Future<void> fetchExchangeRate() async {
+    try {
+      final exchangeRateResponse = await http.get(Uri.parse(
+          'https://openexchangerates.org/api/latest.json?app_id=$appId'));
+
+      if (exchangeRateResponse.statusCode == 200) {
+        final Map<String, dynamic> data =
+            json.decode(exchangeRateResponse.body);
+        // Extract exchange rates from the API response
+        double rate = data['rates'][selectedCurrency2];
+        setState(() {
+          exchangeRate = rate;
+        });
+      } else {
+        throw Exception('Failed to fetch exchange rates');
+      }
+    } catch (error) {
+      print('Error fetching exchange rates: $error');
+    }
+  }
+
+  void onCurrency1Changed(String? newValue) {
+    if (newValue != null) {
+      setState(() {
+        selectedCurrency1 = newValue;
+      });
+      fetchExchangeRate(); // You need to fetch exchange rate when the first currency changes
+    }
+  }
+
+  void onCurrency2Changed(String? newValue) {
+    if (newValue != null) {
+      setState(() {
+        selectedCurrency2 = newValue;
+      });
+      fetchExchangeRate(); // You need to fetch exchange rate when the second currency changes
+    }
+  }
+
+  void onAmountChanged(String value) {
     setState(() {
-      String temp = selectedCurrency1;
-      selectedCurrency1 = selectedCurrency2;
-      selectedCurrency2 = temp;
+      amount = double.tryParse(value) ?? 0.0;
     });
+  }
+
+  double calculateConvertedAmount() {
+    return amount * exchangeRate;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-/*         title: const Text("Converter"),
- */      ),
+      appBar: AppBar(),
       body: Container(
         child: Column(
           children: [
-            Text(
-              "Currency Converter",
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                fontSize: 40,
-                shadows: [
-                  Shadow(
-                    color: Colors.white,
-                    offset: Offset(2, 2),
-                    blurRadius: 3,
-                  ),
-                ],
-              ),
-            ),
-            const Text("We Are Here To Serve You",
-            style: TextStyle(
-              fontWeight: FontWeight.w400
-            ),
-            
+            Text("Currency Converter",
+                style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 40,
+                    shadows: [
+                      Shadow(
+                        color: Colors.white,
+                        offset: Offset(2, 2),
+                        blurRadius: 3,
+                      ),
+                    ])),
+            const Text(
+              "We Are Here To Serve You",
+              style: TextStyle(fontWeight: FontWeight.w400),
             ),
             const SizedBox(
               height: 40,
@@ -75,52 +131,38 @@ class _ConverterState extends State<Converter> {
                 children: [
                   Row(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(left: 15),
-                        child: Image(
-                          image: AssetImage(getFlagImage(selectedCurrency1)),
-                          height: 50,
-                          width: 50,
-                        ),
-                      ),
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: DropdownExample(
-                            selectedCurrency: selectedCurrency1,
-                            onChanged: (String newValue) {
-                              setState(() {
-                                selectedCurrency1 = newValue; // Update selected currency for the first dropdown
-                              });
-                            },
+                          padding: EdgeInsets.fromLTRB(15.0, 0, 100.0, 0),
+                          child: SizedBox(
+                            width: 50,
+                            child: DropdownButton<String>(
+                              value: selectedCurrency1,
+                              onChanged: onCurrency1Changed,
+                              items: currencies.map((String currency) {
+                                return DropdownMenuItem<String>(
+                                  value: currency,
+                                  child: Text(currency),
+                                );
+                              }).toList(),
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.only(
-                              left: 5, top: 5, right: 10, bottom: 5),
-                          child: Container(
-                            width: 700,
-                            color: const Color.fromARGB(
-                                255, 226, 226, 226),
-                            child: Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
-                              children: const [
-                                Expanded(
-                                  child: TextField(
-                                    decoration: InputDecoration(
-                                      filled: true,
-                                      fillColor: Color.fromARGB(
-                                          255, 226, 226, 226),
-                                      hintText: 'Enter Your Amount',
-                                      border: InputBorder.none,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                          padding: const EdgeInsets.all(8.0),
+                          child: TextField(
+                            onChanged: onAmountChanged,
+                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: <TextInputFormatter>[
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                            ],
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Color.fromARGB(255, 226, 226, 226),
+                              hintText: 'Enter Your Amount',
+                              border: InputBorder.none,
                             ),
                           ),
                         ),
@@ -130,71 +172,42 @@ class _ConverterState extends State<Converter> {
                 ],
               ),
             ),
-                    Container(
-                    decoration: BoxDecoration(
-                      color: Color.fromARGB(255, 4, 58, 235), // Background color
-                      shape: BoxShape.circle, // Makes the container circular
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.compress_rounded),
-                      iconSize: 35,
-                      color: Colors.white, // Foreground color
-                      onPressed: swapCurrencies,
-                    ),
-                  ),
+            SizedBox(height: 20),
             Container(
               color: const Color.fromARGB(255, 243, 243, 243),
               child: Column(
                 children: [
                   Row(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(left: 15),
-                        child: Image(
-                          image: AssetImage(getFlagImage(selectedCurrency2)),
-                          height: 50,
-                          width: 50,
-                        ),
-                      ),
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: DropdownSecond(
-                            selectedCurrency: selectedCurrency2,
-                            onChanged: (String newValue) {
-                              setState(() {
-                                selectedCurrency2 = newValue; // Update selected currency for the second dropdown
-                              });
-                            },
+                          padding: EdgeInsets.fromLTRB(15.0, 0, 100.0, 0),
+                          child: SizedBox(
+                            width: 50,
+                            child: DropdownButton<String>(
+                              value: selectedCurrency2,
+                              onChanged: onCurrency2Changed,
+                              items: currencies.map((String currency) {
+                                return DropdownMenuItem<String>(
+                                  value: currency,
+                                  child: Text(currency),
+                                );
+                              }).toList(),
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.only(
-                              left: 5, top: 5, right: 10, bottom: 5),
-                          child: Container(
-                            width: 700,
-                            color: const Color.fromARGB(
-                                255, 226, 226, 226),
-                            child: Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
-                              children: const [
-                                Expanded(
-                                  child: TextField(
-                                    enabled: false,
-                                    decoration: InputDecoration(
-                                      filled: true,
-                                      fillColor: Color.fromARGB(
-                                          255, 226, 226, 226),
-                                      hintText: 'Converted Amount',
-                                      border: InputBorder.none,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                          padding: const EdgeInsets.all(8.0),
+                          child: TextField(
+                            enabled: false,
+                            controller: TextEditingController(text: calculateConvertedAmount().toStringAsFixed(2)),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Color.fromARGB(255, 226, 226, 226),
+                              hintText: 'Converted Amount',
+                              border: InputBorder.none,
                             ),
                           ),
                         ),
@@ -207,76 +220,6 @@ class _ConverterState extends State<Converter> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class DropdownExample extends StatelessWidget {
-  final String selectedCurrency;
-  final ValueChanged<String> onChanged;
-
-  const DropdownExample({
-    Key? key,
-    required this.selectedCurrency,
-    required this.onChanged,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 20),
-        DropdownButton<String>(
-          value: selectedCurrency,
-          onChanged: (String? newValue) {
-            if (newValue != null) {
-              onChanged(newValue); // Call the onChanged callback
-            }
-          },
-          items: <String>['USD', 'EUR', 'GBP', 'JPY', 'RS'] // List of currencies
-              .map<DropdownMenuItem<String>>((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-}
-
-class DropdownSecond extends StatelessWidget {
-  final String selectedCurrency;
-  final ValueChanged<String> onChanged;
-
-  const DropdownSecond({
-    Key? key,
-    required this.selectedCurrency,
-    required this.onChanged,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 20),
-        DropdownButton<String>(
-          value: selectedCurrency,
-          onChanged: (String? newValue) {
-            if (newValue != null) {
-              onChanged(newValue); // Call the onChanged callback
-            }
-          },
-          items: <String>['USD', 'EUR', 'GBP', 'JPY', 'RS'] // List of currencies
-              .map<DropdownMenuItem<String>>((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value),
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 }

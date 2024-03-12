@@ -1,9 +1,18 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertest/Converter.dart';
 import 'package:fluttertest/Login.dart';
 import 'package:fluttertest/Signup.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  Firebase.initializeApp(
+    options: FirebaseOptions(
+      apiKey: 'AIzaSyC1DvLecsN9coRXWQpqeS9EmNGSwQftVuc',
+       appId: '1:1068435807420:android:0839ccb83e271e1cd684b9',
+        messagingSenderId: '1068435807420',
+         projectId: 'currenseeapp-794eb')
+  );
   runApp(const MyApp());
 }
 
